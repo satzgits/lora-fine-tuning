@@ -8,14 +8,27 @@ Fine-tunes large language models using Low-Rank Adaptation (LoRA) — a paramete
 Load Base Model → Apply LoRA Adapters → Train on Custom Data → Save Adapter (~10MB) → Load & Inference
 ```
 
-Each stage is a separate step in the script, making it straightforward to swap models, datasets, or LoRA configurations.
+Each stage is an independent module — swap models, datasets, or LoRA configs without touching the pipeline code.
 
 ## Project Structure
 
 ```
 lora-fine-tuning/
-├── lora_finetune.py        # Full pipeline: load, train, save, infer
-├── Dockerfile              # CPU-based training container
+├── config/
+│   └── training_config.yaml      # All hyperparameters in one place
+├── src/
+│   ├── data.py                   # Dataset creation + tokenization
+│   ├── model_setup.py            # Base model loading + LoRA injection
+│   ├── train.py                  # HuggingFace Trainer wrapper
+│   ├── inference.py              # Adapter reload + generation
+│   └── utils.py                  # Logging, YAML loading, saving
+├── tests/
+│   ├── __init__.py
+│   └── test_pipeline.py          # Config + data tests
+├── main.py                       # Orchestrator: load → train → save → infer
+├── Dockerfile
+├── Makefile                      # install, train, test, docker
+├── pyproject.toml                # Project metadata + dep management
 ├── requirements.txt
 └── README.md
 ```
@@ -23,9 +36,37 @@ lora-fine-tuning/
 ## Quick Start
 
 ```bash
-pip install -r requirements.txt
-python lora_finetune.py
+make install      # pip install -r requirements.txt
+make train        # python main.py
+make test         # pytest tests/ -v
 ```
+
+## Configuration
+
+All parameters live in `config/training_config.yaml`:
+
+```yaml
+model:
+  name: "Qwen/Qwen2.5-1.5B-Instruct"
+  torch_dtype: "float16"
+
+lora:
+  r: 8                # rank — higher = more capacity, more VRAM
+  alpha: 16           # scaling factor
+  target_modules:     # which layers get adapters
+    - "q_proj"
+    - "v_proj"
+
+training:
+  epochs: 3
+  batch_size: 2
+  learning_rate: 2.0e-4
+
+data:
+  num_samples: 12
+```
+
+Change any value without editing Python code.
 
 ## What LoRA Does
 
@@ -44,27 +85,27 @@ This means:
 - Multiple adapters can coexist for the same base model — swap at inference time
 - No risk of catastrophic forgetting (base model weights never change)
 
-## How the Script Works
+## Pipeline Stages
 
-| Stage | What Happens |
-|-------|-------------|
-| Load base model | Downloads Qwen2.5-1.5B-Instruct from HuggingFace (3GB in FP16) |
-| Apply LoRA | Injects adapters on query, key, value, output projections (rank=8) |
-| Prepare data | Formats 12 sentiment-labeled reviews as instruction examples |
-| Train | Fine-tunes for 3 epochs with FP16 mixed precision |
-| Save adapter | Writes adapter weights to `./lora-adapter/` (~10MB) |
-| Load + infer | Loads adapter on fresh base model, runs inference on test reviews |
+| Stage | Module | What Happens |
+|-------|--------|-------------|
+| 1. Load base model | `model_setup.py` | Downloads Qwen2.5-1.5B-Instruct from HuggingFace (3GB in FP16) |
+| 2. Apply LoRA | `model_setup.py` | Injects adapters on query, key, value, output projections (rank=8) |
+| 3. Prepare data | `data.py` | Formats 12 sentiment-labeled reviews as instruction examples |
+| 4. Train | `train.py` | Fine-tunes for 3 epochs with FP16 mixed precision |
+| 5. Save adapter | `utils.py` | Writes adapter weights to `./lora-adapter/` (~10MB) |
+| 6. Load + infer | `inference.py` | Loads adapter on fresh base model, runs inference on test reviews |
 
 ## Docker
 
 ```bash
-docker build -t lora-fine-tuning .
+make docker       # docker build -t lora-fine-tuning .
 docker run --gpus all lora-fine-tuning   # Requires NVIDIA Container Toolkit
 ```
 
-Or for CPU-only testing:
+For CPU-only testing:
 ```bash
-docker build -t lora-fine-tuning .
+make docker
 docker run lora-fine-tuning
 ```
 
@@ -73,7 +114,7 @@ docker run lora-fine-tuning
 ```
 Loading base model: Qwen/Qwen2.5-1.5B-Instruct
 Model loaded. Total parameters: 1,540,000,000
-Applying LoRA (r=8, alpha=16)... 
+Applying LoRA (r=8, alpha=16)...
 Trainable: 4,194,304 / 1,540,000,000 (0.27%)
 
 Training...  Epoch 1/3  Loss: 1.42
@@ -87,11 +128,10 @@ Inference: "This is terrible." → NEGATIVE
 
 ## Customization
 
-Edit `lora_finetune.py` to:
-- Change `MODEL_NAME` to any HuggingFace causal LM
-- Use your own dataset by modifying `create_dataset()`
-- Adjust LoRA parameters (`r`, `alpha`, `target_modules`)
-- Train for more epochs or on larger datasets
+- **Swap model:** Change `model.name` in `config/training_config.yaml`
+- **Use your dataset:** Edit `src/data.py` → `create_sentiment_dataset()`
+- **Adjust LoRA params:** Edit `config.lora` in the YAML file
+- **More epochs/larger data:** Edit `config.training` and `config.data`
 
 ## Dependencies
 
@@ -99,3 +139,4 @@ Edit `lora_finetune.py` to:
 - HuggingFace Transformers
 - PEFT (Parameter-Efficient Fine-Tuning)
 - Datasets + Accelerate
+- PyYAML

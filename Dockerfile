@@ -7,6 +7,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY lora_finetune.py .
+COPY config/ config/
+COPY src/ src/
+COPY main.py .
 
-CMD ["python", "lora_finetune.py"]
+CMD ["python", "main.py"]

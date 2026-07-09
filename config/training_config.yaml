@@ -1,0 +1,35 @@
+# LoRA Fine-Tuning Configuration
+model:
+  name: "Qwen/Qwen2.5-1.5B-Instruct"
+  torch_dtype: "float16"          # float16, float32, or bfloat16
+  device_map: "auto"
+
+lora:
+  r: 8                            # LoRA rank
+  alpha: 16                       # Scaling factor
+  dropout: 0.05
+  target_modules:                 # Modules to apply LoRA
+    - "q_proj"
+    - "v_proj"
+    - "k_proj"
+    - "o_proj"
+  bias: "none"
+
+training:
+  batch_size: 2
+  gradient_accumulation_steps: 4
+  epochs: 3
+  learning_rate: 2.0e-4
+  fp16: true
+  max_length: 128
+  logging_steps: 1
+  output_dir: "./checkpoints"
+  save_strategy: "no"
+
+data:
+  num_samples: 12
+  train_split: 0.8
+
+inference:
+  temperature: 0.1
+  max_new_tokens: 10

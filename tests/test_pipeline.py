@@ -47,11 +47,11 @@ def test_lora_config_structure():
 
 if __name__ == "__main__":
     test_config_loads()
-    print("✓ test_config_loads")
+    print("[OK] test_config_loads")
     test_dataset_creation()
-    print("✓ test_dataset_creation")
+    print("[OK] test_dataset_creation")
     test_dataset_labels()
-    print("✓ test_dataset_labels")
+    print("[OK] test_dataset_labels")
     test_lora_config_structure()
-    print("✓ test_lora_config_structure")
+    print("[OK] test_lora_config_structure")
     print("\nAll tests passed.")

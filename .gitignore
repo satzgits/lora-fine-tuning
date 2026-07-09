@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+lora-checkpoints/
+lora-adapter/
+.env
+.venv/
